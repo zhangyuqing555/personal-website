@@ -1,0 +1,280 @@
+/* ── Reset & Base ── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { scroll-behavior: smooth; }
+body {
+  font-family: 'Georgia', 'Times New Roman', serif;
+  color: #2c2c2c;
+  background: #fafaf8;
+  line-height: 1.7;
+}
+
+/* ── Colour Palette ── */
+:root {
+  --navy:   #1a2744;
+  --gold:   #b8972a;
+  --mid:    #4a5568;
+  --light:  #f5f4f0;
+  --border: #ddd8cc;
+}
+
+/* ── Navigation ── */
+nav {
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  background: var(--navy);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0 2.5rem;
+  height: 60px;
+}
+nav .logo {
+  color: #fff;
+  font-size: 1rem;
+  font-weight: normal;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+nav ul {
+  list-style: none;
+  display: flex;
+  gap: 2rem;
+}
+nav ul a {
+  color: #c8bfa8;
+  text-decoration: none;
+  font-family: 'Arial', sans-serif;
+  font-size: 0.8rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  transition: color 0.2s;
+}
+nav ul a:hover { color: var(--gold); }
+
+/* ── Hero ── */
+header {
+  background: var(--navy);
+  color: #fff;
+  padding: 6rem 2.5rem 5rem;
+  text-align: center;
+  border-bottom: 4px solid var(--gold);
+}
+header .initials {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 100px;
+  height: 100px;
+  border-radius: 50%;
+  background: var(--gold);
+  color: #fff;
+  font-size: 2.4rem;
+  font-weight: bold;
+  letter-spacing: 0.05em;
+  margin-bottom: 1.5rem;
+}
+header h1 {
+  font-size: 2.6rem;
+  font-weight: normal;
+  letter-spacing: 0.04em;
+  margin-bottom: 0.4rem;
+}
+header .subtitle {
+  font-family: 'Arial', sans-serif;
+  font-size: 0.9rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--gold);
+  margin-bottom: 1.4rem;
+}
+header .firm {
+  font-size: 1rem;
+  color: #c0b89a;
+  margin-bottom: 2rem;
+}
+.btn-row { display: flex; gap: 1rem; justify-content: center; flex-wrap: wrap; }
+.btn {
+  display: inline-block;
+  padding: 0.65rem 1.6rem;
+  border-radius: 2px;
+  font-family: 'Arial', sans-serif;
+  font-size: 0.78rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  text-decoration: none;
+  transition: all 0.2s;
+}
+.btn-primary {
+  background: var(--gold);
+  color: #fff;
+  border: 2px solid var(--gold);
+}
+.btn-primary:hover { background: #9a7c22; border-color: #9a7c22; }
+.btn-outline {
+  background: transparent;
+  color: #fff;
+  border: 2px solid rgba(255,255,255,0.4);
+}
+.btn-outline:hover { border-color: #fff; }
+
+/* ── Section Wrapper ── */
+section { padding: 5rem 2rem; }
+section:nth-child(even) { background: var(--light); }
+.container { max-width: 860px; margin: 0 auto; }
+
+.section-label {
+  font-family: 'Arial', sans-serif;
+  font-size: 0.72rem;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--gold);
+  margin-bottom: 0.6rem;
+}
+h2 {
+  font-size: 1.9rem;
+  font-weight: normal;
+  color: var(--navy);
+  margin-bottom: 1.6rem;
+  padding-bottom: 0.8rem;
+  border-bottom: 1px solid var(--border);
+}
+
+/* ── About ── */
+.about-text p { margin-bottom: 1.1rem; color: var(--mid); font-size: 1.03rem; }
+.lang-tag {
+  display: inline-block;
+  margin-top: 0.8rem;
+  padding: 0.3rem 0.9rem;
+  background: var(--navy);
+  color: #c8bfa8;
+  font-family: 'Arial', sans-serif;
+  font-size: 0.75rem;
+  letter-spacing: 0.12em;
+}
+
+/* ── Practice Areas ── */
+.practice-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 1.4rem;
+  margin-top: 0.5rem;
+}
+.practice-card {
+  background: #fff;
+  border: 1px solid var(--border);
+  border-top: 3px solid var(--navy);
+  padding: 1.6rem 1.4rem;
+}
+.practice-card h3 {
+  font-size: 1rem;
+  color: var(--navy);
+  margin-bottom: 0.5rem;
+  font-weight: bold;
+}
+.practice-card p {
+  font-family: 'Arial', sans-serif;
+  font-size: 0.83rem;
+  color: var(--mid);
+  line-height: 1.6;
+}
+
+/* ── Experience ── */
+.timeline { margin-top: 0.5rem; }
+.timeline-item {
+  display: flex;
+  gap: 1.4rem;
+  margin-bottom: 2.2rem;
+  padding-bottom: 2.2rem;
+  border-bottom: 1px solid var(--border);
+}
+.timeline-item:last-child { border-bottom: none; margin-bottom: 0; padding-bottom: 0; }
+.tl-dot {
+  flex-shrink: 0;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--gold);
+  margin-top: 0.45rem;
+}
+.tl-content h3 {
+  font-size: 1.05rem;
+  color: var(--navy);
+  margin-bottom: 0.2rem;
+}
+.tl-content .tl-org {
+  font-family: 'Arial', sans-serif;
+  font-size: 0.82rem;
+  color: var(--gold);
+  margin-bottom: 0.4rem;
+  letter-spacing: 0.05em;
+}
+.tl-content p {
+  font-family: 'Arial', sans-serif;
+  font-size: 0.88rem;
+  color: var(--mid);
+}
+
+/* ── Education & Admissions ── */
+.two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 3rem; }
+@media (max-width: 600px) { .two-col { grid-template-columns: 1fr; gap: 2rem; } }
+.edu-list, .admit-list { list-style: none; margin-top: 0.4rem; }
+.edu-list li, .admit-list li {
+  padding: 0.7rem 0;
+  border-bottom: 1px solid var(--border);
+  font-family: 'Arial', sans-serif;
+  font-size: 0.9rem;
+  color: var(--mid);
+}
+.edu-list li:last-child, .admit-list li:last-child { border-bottom: none; }
+.edu-list strong, .admit-list strong {
+  display: block;
+  color: var(--navy);
+  font-size: 0.83rem;
+  letter-spacing: 0.05em;
+  margin-bottom: 0.1rem;
+}
+
+/* ── Contact ── */
+#contact { background: var(--navy); color: #fff; }
+#contact h2 { color: #fff; border-color: rgba(255,255,255,0.15); }
+#contact .section-label { color: var(--gold); }
+.contact-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 2rem;
+  margin-top: 1rem;
+}
+.contact-item h4 {
+  font-family: 'Arial', sans-serif;
+  font-size: 0.72rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--gold);
+  margin-bottom: 0.5rem;
+}
+.contact-item p, .contact-item a {
+  font-family: 'Arial', sans-serif;
+  font-size: 0.9rem;
+  color: #c0b89a;
+  text-decoration: none;
+  line-height: 1.6;
+}
+.contact-item a:hover { color: #fff; }
+
+/* ── Footer ── */
+footer {
+  background: #111827;
+  color: #6b7280;
+  text-align: center;
+  padding: 1.4rem;
+  font-family: 'Arial', sans-serif;
+  font-size: 0.78rem;
+  letter-spacing: 0.05em;
+}
+
+/* ── Responsive Nav ── */
+@media (max-width: 600px) {
+  nav ul { gap: 1rem; }
+  header h1 { font-size: 1.8rem; }
+}
