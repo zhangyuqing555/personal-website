@@ -1,0 +1,402 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SPR Decisions Search | MHTL</title>
+  <link rel="stylesheet" href="/css/style.css" />
+  <link rel="stylesheet" href="/css/decisions.css" />
+</head>
+<body class="decisions-page">
+
+  <!-- Navigation -->
+  <nav>
+    <span class="logo"><a href="/" style="text-decoration:none;color:inherit;">Walter Zhang</a></span>
+    <ul>
+      <li><a href="/decisions" class="active">SPR Search</a></li>
+      <li><a href="/analyze">Analyze</a></li>
+      <li><a href="/">My Profile</a></li>
+    </ul>
+  </nav>
+
+  <!-- Page Header -->
+  <div class="page-header">
+    <div class="container">
+      <p class="section-label">Massachusetts Public Records Division</p>
+      <h1>SPR Decisions Search</h1>
+      <p class="page-desc">Search Supervisor of Records decisions from 2014–2026 using Boolean, phrase, and proximity operators.</p>
+    </div>
+  </div>
+
+  <!-- Search Bar -->
+  <div class="search-bar-wrapper">
+    <div class="container">
+      <form id="search-form" autocomplete="off">
+        <div class="search-input-row">
+          <input
+            type="text"
+            id="query"
+            name="q"
+            placeholder='Search decisions… e.g.  "police department" AND fees  OR  email NOT exempt'
+            autocomplete="off"
+            spellcheck="false"
+          />
+          <button type="submit" class="btn btn-primary">Search</button>
+        </div>
+
+        <!-- Filters row -->
+        <div class="filter-row">
+          <div class="filter-group">
+            <label>Year From</label>
+            <input type="number" id="year_from" name="year_from" placeholder="2014" min="2014" max="2026" />
+          </div>
+          <div class="filter-group">
+            <label>Year To</label>
+            <input type="number" id="year_to" name="year_to" placeholder="2026" min="2014" max="2026" />
+          </div>
+          <div class="filter-group">
+            <label>Agency contains</label>
+            <input type="text" id="agency" name="agency" placeholder="e.g. Boston" />
+          </div>
+          <div class="filter-group">
+            <label>Outcome</label>
+            <select id="outcome" name="outcome">
+              <option value="">All outcomes</option>
+              <option value="ordered_to_provide">Ordered to Provide</option>
+              <option value="closed">Closed</option>
+              <option value="fee_dispute">Fee Dispute</option>
+              <option value="records_withheld">Records Withheld</option>
+              <option value="exemption_claimed">Exemption Claimed</option>
+              <option value="other">Other</option>
+            </select>
+          </div>
+          <button type="button" id="clear-filters" class="btn btn-outline btn-sm">Clear</button>
+        </div>
+
+        <!-- Syntax help -->
+        <div class="syntax-help">
+          <span class="help-label">Operators:</span>
+          <span class="tag" onclick="insertOp(' AND ')">AND</span>
+          <span class="tag" onclick="insertOp(' OR ')">OR</span>
+          <span class="tag" onclick="insertOp(' NOT ')">NOT</span>
+          <span class="tag" onclick="insertPhrase()">&#34;phrase&#34;</span>
+          <span class="tag" onclick="insertOp(' /5 ')">/N (proximity)</span>
+          <span class="tag" onclick="insertOp(' /S ')">/S (sentence)</span>
+          <span class="tag" onclick="insertOp(' /P ')">/P (paragraph)</span>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Results area -->
+  <div class="container results-container">
+
+    <!-- Stats bar (shown when idle) -->
+    <div id="stats-bar" class="stats-bar">
+      <span id="db-stats">Loading database stats…</span>
+    </div>
+
+    <!-- Result count + sort -->
+    <div id="results-header" class="results-header" style="display:none;">
+      <span id="results-count"></span>
+      <span id="results-time" class="results-time"></span>
+    </div>
+
+    <!-- Results list -->
+    <div id="results-list"></div>
+
+    <!-- Pagination -->
+    <div id="pagination" class="pagination"></div>
+
+    <!-- Loading spinner -->
+    <div id="loading" class="loading" style="display:none;">
+      <div class="spinner"></div>
+      <p>Searching…</p>
+    </div>
+
+    <!-- Error message -->
+    <div id="error-msg" class="error-msg" style="display:none;"></div>
+
+  </div>
+
+  <!-- Decision Detail Modal -->
+  <div id="modal-overlay" class="modal-overlay" style="display:none;">
+    <div class="modal-box">
+      <button class="modal-close" onclick="closeModal()">&#x2715;</button>
+      <div id="modal-content"></div>
+    </div>
+  </div>
+
+  <footer>
+    &copy; 2026 Walter Zhang &mdash; Murphy, Hesse, Toomey &amp; Lehane, LLP &mdash; Internal Use Only
+  </footer>
+
+  <script>
+    // ─── State ────────────────────────────────────────────────────────────────
+    let currentPage = 1;
+    let lastQuery = {};
+
+    // ─── Init ─────────────────────────────────────────────────────────────────
+    document.addEventListener('DOMContentLoaded', () => {
+      loadStats();
+      // Restore query from URL params if any
+      const params = new URLSearchParams(window.location.search);
+      if (params.get('q')) {
+        document.getElementById('query').value = params.get('q');
+        if (params.get('year_from')) document.getElementById('year_from').value = params.get('year_from');
+        if (params.get('year_to')) document.getElementById('year_to').value = params.get('year_to');
+        if (params.get('agency')) document.getElementById('agency').value = params.get('agency');
+        if (params.get('outcome')) document.getElementById('outcome').value = params.get('outcome');
+        runSearch(1);
+      }
+    });
+
+    // ─── Stats ────────────────────────────────────────────────────────────────
+    async function loadStats() {
+      try {
+        const res = await fetch('/api/stats');
+        if (!res.ok) {
+          document.getElementById('db-stats').textContent = 'Database not yet populated. Run the extraction script to import decisions.';
+          return;
+        }
+        const data = await res.json();
+        const yearRange = data.byYear.length
+          ? `${data.byYear[0].year}–${data.byYear[data.byYear.length - 1].year}`
+          : 'N/A';
+        document.getElementById('db-stats').innerHTML =
+          `<strong>${data.total.toLocaleString()}</strong> decisions indexed &bull; ` +
+          `Years: <strong>${yearRange}</strong> &bull; ` +
+          `<a href="/analyze">Try the Analysis Tool &rarr;</a>`;
+      } catch {
+        document.getElementById('db-stats').textContent = 'Database not yet populated.';
+      }
+    }
+
+    // ─── Search ───────────────────────────────────────────────────────────────
+    document.getElementById('search-form').addEventListener('submit', e => {
+      e.preventDefault();
+      runSearch(1);
+    });
+
+    document.getElementById('clear-filters').addEventListener('click', () => {
+      document.getElementById('year_from').value = '';
+      document.getElementById('year_to').value = '';
+      document.getElementById('agency').value = '';
+      document.getElementById('outcome').value = '';
+    });
+
+    async function runSearch(page) {
+      const q = document.getElementById('query').value.trim();
+      if (!q) return;
+
+      const params = {
+        q,
+        year_from: document.getElementById('year_from').value,
+        year_to: document.getElementById('year_to').value,
+        agency: document.getElementById('agency').value,
+        outcome: document.getElementById('outcome').value,
+        page,
+        per_page: 20,
+      };
+      // Remove empty params
+      Object.keys(params).forEach(k => { if (!params[k]) delete params[k]; });
+      lastQuery = params;
+      currentPage = page;
+
+      // Update URL
+      history.replaceState({}, '', '?' + new URLSearchParams(params).toString());
+
+      showLoading(true);
+      hideError();
+      document.getElementById('results-header').style.display = 'none';
+      document.getElementById('stats-bar').style.display = 'none';
+
+      const t0 = Date.now();
+      try {
+        const res = await fetch('/api/search?' + new URLSearchParams(params).toString());
+        const data = await res.json();
+        const elapsed = ((Date.now() - t0) / 1000).toFixed(2);
+
+        if (!res.ok) {
+          showError(data.error || 'Search failed.');
+          return;
+        }
+
+        renderResults(data, elapsed);
+      } catch (err) {
+        showError('Network error. Please try again.');
+      } finally {
+        showLoading(false);
+      }
+    }
+
+    // ─── Render ───────────────────────────────────────────────────────────────
+    function renderResults(data, elapsed) {
+      const header = document.getElementById('results-header');
+      const list = document.getElementById('results-list');
+      const pager = document.getElementById('pagination');
+
+      header.style.display = 'flex';
+      document.getElementById('results-count').textContent =
+        `${data.total.toLocaleString()} result${data.total !== 1 ? 's' : ''}`;
+      document.getElementById('results-time').textContent = `(${elapsed}s)`;
+
+      if (data.results.length === 0) {
+        list.innerHTML = '<div class="no-results"><p>No decisions matched your search.</p><p class="hint">Try fewer or different terms, or remove filters.</p></div>';
+        pager.innerHTML = '';
+        return;
+      }
+
+      list.innerHTML = data.results.map(r => `
+        <div class="result-card" onclick="openDecision(${r.id})">
+          <div class="result-top">
+            <span class="spr-badge">${escHtml(r.spr_number || 'N/A')}</span>
+            <span class="result-date">${r.date || 'Undated'}</span>
+            <span class="outcome-badge outcome-${r.outcome}">${formatOutcome(r.outcome)}</span>
+          </div>
+          <div class="result-agency">${escHtml(r.agency || 'Unknown Agency')}</div>
+          <div class="result-petitioner">Petitioner: ${escHtml(r.petitioner || 'Unknown')}</div>
+          <div class="result-snippet">${renderSnippet(r.snippet || r.request_summary || '')}</div>
+        </div>
+      `).join('');
+
+      renderPagination(data.page, data.pages);
+    }
+
+    function renderSnippet(text) {
+      // Convert **bold** markers to <mark> highlights
+      return escHtml(text).replace(/\*\*(.+?)\*\*/g, '<mark>$1</mark>');
+    }
+
+    function renderPagination(page, pages) {
+      const pager = document.getElementById('pagination');
+      if (pages <= 1) { pager.innerHTML = ''; return; }
+      let html = '';
+      if (page > 1) html += `<button onclick="runSearch(${page - 1})">&larr; Prev</button>`;
+      // Show up to 7 page buttons around current
+      const start = Math.max(1, page - 3);
+      const end = Math.min(pages, page + 3);
+      if (start > 1) html += `<button onclick="runSearch(1)">1</button><span class="ellipsis">…</span>`;
+      for (let i = start; i <= end; i++) {
+        html += `<button class="${i === page ? 'active' : ''}" onclick="runSearch(${i})">${i}</button>`;
+      }
+      if (end < pages) html += `<span class="ellipsis">…</span><button onclick="runSearch(${pages})">${pages}</button>`;
+      if (page < pages) html += `<button onclick="runSearch(${page + 1})">Next &rarr;</button>`;
+      pager.innerHTML = html;
+    }
+
+    // ─── Decision Modal ────────────────────────────────────────────────────────
+    async function openDecision(id) {
+      const overlay = document.getElementById('modal-overlay');
+      document.getElementById('modal-content').innerHTML = '<div class="spinner"></div>';
+      overlay.style.display = 'flex';
+      document.body.style.overflow = 'hidden';
+
+      try {
+        const res = await fetch(`/api/decisions/${id}`);
+        const d = await res.json();
+        document.getElementById('modal-content').innerHTML = `
+          <div class="modal-header">
+            <h2>${escHtml(d.spr_number || 'Decision')}</h2>
+            <div class="modal-meta">
+              <span>${d.date || 'Undated'}</span>
+              <span class="outcome-badge outcome-${d.outcome}">${formatOutcome(d.outcome)}</span>
+            </div>
+          </div>
+          <div class="modal-info-grid">
+            <div><strong>Agency</strong><br>${escHtml(d.agency || '—')}</div>
+            <div><strong>Petitioner</strong><br>${escHtml(d.petitioner || '—')}</div>
+            <div><strong>Year</strong><br>${d.year || '—'}</div>
+            <div><strong>Source</strong><br>${escHtml(d.pdf_source || '—')}</div>
+          </div>
+          ${d.request_summary ? `<div class="modal-section"><strong>Request Summary</strong><p>${escHtml(d.request_summary)}</p></div>` : ''}
+          <div class="modal-section">
+            <strong>Full Decision Text</strong>
+            <pre class="full-text">${escHtml(d.full_text || '')}</pre>
+          </div>
+          <div class="modal-actions">
+            <button class="btn btn-outline" onclick="analyzeThis(${JSON.stringify(d.request_summary || '').replace(/"/g,'&quot;')})">Analyze Similar Request</button>
+          </div>
+        `;
+      } catch {
+        document.getElementById('modal-content').innerHTML = '<p>Failed to load decision.</p>';
+      }
+    }
+
+    function closeModal() {
+      document.getElementById('modal-overlay').style.display = 'none';
+      document.body.style.overflow = '';
+    }
+
+    document.getElementById('modal-overlay').addEventListener('click', e => {
+      if (e.target === document.getElementById('modal-overlay')) closeModal();
+    });
+
+    document.addEventListener('keydown', e => {
+      if (e.key === 'Escape') closeModal();
+    });
+
+    function analyzeThis(summary) {
+      closeModal();
+      window.location.href = `/analyze?prefill=${encodeURIComponent(summary)}`;
+    }
+
+    // ─── Operator helpers ─────────────────────────────────────────────────────
+    function insertOp(op) {
+      const input = document.getElementById('query');
+      const pos = input.selectionStart;
+      const val = input.value;
+      input.value = val.slice(0, pos) + op + val.slice(pos);
+      input.focus();
+      input.selectionStart = input.selectionEnd = pos + op.length;
+    }
+
+    function insertPhrase() {
+      const input = document.getElementById('query');
+      const start = input.selectionStart;
+      const end = input.selectionEnd;
+      const val = input.value;
+      const selected = val.slice(start, end);
+      input.value = val.slice(0, start) + '"' + (selected || 'phrase') + '"' + val.slice(end);
+      input.focus();
+    }
+
+    // ─── Utilities ────────────────────────────────────────────────────────────
+    function formatOutcome(outcome) {
+      const map = {
+        ordered_to_provide: 'Ordered to Provide',
+        closed: 'Closed',
+        fee_dispute: 'Fee Dispute',
+        records_withheld: 'Records Withheld',
+        exemption_claimed: 'Exemption',
+        other: 'Other',
+      };
+      return map[outcome] || outcome || 'Unknown';
+    }
+
+    function escHtml(str) {
+      return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+    }
+
+    function showLoading(on) {
+      document.getElementById('loading').style.display = on ? 'flex' : 'none';
+      document.getElementById('results-list').innerHTML = on ? '' : document.getElementById('results-list').innerHTML;
+    }
+
+    function showError(msg) {
+      const el = document.getElementById('error-msg');
+      el.textContent = msg;
+      el.style.display = 'block';
+    }
+
+    function hideError() {
+      document.getElementById('error-msg').style.display = 'none';
+    }
+  </script>
+
+</body>
+</html>

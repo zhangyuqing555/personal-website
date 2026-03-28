@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Appeal Analyzer | MHTL</title>
+  <link rel="stylesheet" href="/css/style.css" />
+  <link rel="stylesheet" href="/css/decisions.css" />
+</head>
+<body class="decisions-page">
+
+  <nav>
+    <span class="logo"><a href="/" style="text-decoration:none;color:inherit;">Walter Zhang</a></span>
+    <ul>
+      <li><a href="/decisions">SPR Search</a></li>
+      <li><a href="/analyze" class="active">Analyze</a></li>
+      <li><a href="/">My Profile</a></li>
+    </ul>
+  </nav>
+
+  <div class="page-header">
+    <div class="container">
+      <p class="section-label">AI-Powered Legal Analysis</p>
+      <h1>Public Records Appeal Analyzer</h1>
+      <p class="page-desc">Paste a public records request and the agency's response to predict the likely outcome on appeal and get actionable advice.</p>
+    </div>
+  </div>
+
+  <div class="container analyze-container">
+
+    <form id="analyze-form">
+      <div class="analyze-grid">
+
+        <!-- Left column: inputs -->
+        <div class="analyze-inputs">
+
+          <div class="form-group">
+            <label for="request_text">
+              Public Records Request
+              <span class="label-hint">Paste the exact text of the request that was submitted</span>
+            </label>
+            <textarea
+              id="request_text"
+              name="request_text"
+              rows="8"
+              placeholder="e.g. I am requesting all emails sent by or to the Police Department from January 1, 2023 to December 31, 2023 that contain the word 'overtime'…"
+              required
+            ></textarea>
+          </div>
+
+          <div class="form-group">
+            <label for="agency_name">
+              Agency Name <span class="optional">(optional)</span>
+            </label>
+            <input
+              type="text"
+              id="agency_name"
+              name="agency_name"
+              placeholder="e.g. City of Boston Police Department"
+            />
+          </div>
+
+          <div class="form-group">
+            <label for="agency_response">
+              Agency's Response
+              <span class="label-hint">Paste the agency's full response or denial letter</span>
+            </label>
+            <textarea
+              id="agency_response"
+              name="agency_response"
+              rows="10"
+              placeholder="e.g. In response to your request, the Department is denying access pursuant to G.L. c. 4, § 7(26)(f) (investigatory exemption) because…"
+              required
+            ></textarea>
+          </div>
+
+          <div class="form-actions">
+            <button type="submit" class="btn btn-primary" id="analyze-btn">
+              Analyze Appeal
+            </button>
+            <button type="button" class="btn btn-outline" onclick="clearForm()">Clear</button>
+          </div>
+
+          <p class="api-note" id="api-note" style="display:none;">
+            &#9888; Analysis requires an <code>ANTHROPIC_API_KEY</code> environment variable.
+            Set it in your <code>.env</code> file or shell before starting the server.
+          </p>
+        </div>
+
+        <!-- Right column: results -->
+        <div class="analyze-results" id="analyze-results">
+
+          <div id="results-placeholder" class="results-placeholder">
+            <div class="placeholder-icon">&#9878;</div>
+            <h3>Analysis will appear here</h3>
+            <p>Fill in the request and response on the left, then click <strong>Analyze Appeal</strong>.</p>
+            <ul class="placeholder-list">
+              <li>Outcome prediction (Strong / Moderate / Weak)</li>
+              <li>Key legal issues identified</li>
+              <li>Your strongest arguments</li>
+              <li>Weaknesses &amp; risks</li>
+              <li>Actionable next steps</li>
+              <li>Similar past SPR decisions</li>
+            </ul>
+          </div>
+
+          <div id="analysis-loading" class="loading" style="display:none;">
+            <div class="spinner"></div>
+            <p>Analyzing appeal…</p>
+          </div>
+
+          <div id="analysis-output" style="display:none;">
+
+            <div id="analysis-text" class="analysis-text"></div>
+
+            <div id="precedents-section" class="precedents-section" style="display:none;">
+              <h3>Similar Past Decisions</h3>
+              <div id="precedents-list"></div>
+            </div>
+
+            <div class="analysis-actions">
+              <button class="btn btn-outline btn-sm" onclick="copyAnalysis()">Copy Analysis</button>
+              <a href="/decisions" class="btn btn-outline btn-sm">Search Decisions</a>
+            </div>
+
+          </div>
+
+          <div id="analysis-error" class="error-msg" style="display:none;"></div>
+        </div>
+
+      </div>
+    </form>
+
+  </div>
+
+  <footer>
+    &copy; 2026 Walter Zhang &mdash; Murphy, Hesse, Toomey &amp; Lehane, LLP &mdash; Internal Use Only
+  </footer>
+
+  <script>
+    // Prefill from search page "Analyze Similar" button
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('prefill')) {
+      document.getElementById('request_text').value = decodeURIComponent(params.get('prefill'));
+    }
+
+    document.getElementById('analyze-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+
+      const requestText = document.getElementById('request_text').value.trim();
+      const agencyResponse = document.getElementById('agency_response').value.trim();
+      const agencyName = document.getElementById('agency_name').value.trim();
+
+      if (!requestText || !agencyResponse) {
+        alert('Please fill in both the request and the agency response.');
+        return;
+      }
+
+      showLoading(true);
+      document.getElementById('analyze-btn').disabled = true;
+      document.getElementById('api-note').style.display = 'none';
+
+      try {
+        const res = await fetch('/api/analyze', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ request_text: requestText, agency_response: agencyResponse, agency_name: agencyName }),
+        });
+
+        const data = await res.json();
+
+        if (!res.ok) {
+          if (res.status === 503 && data.error && data.error.includes('ANTHROPIC_API_KEY')) {
+            document.getElementById('api-note').style.display = 'block';
+          }
+          showError(data.error || 'Analysis failed.');
+          return;
+        }
+
+        renderAnalysis(data);
+      } catch (err) {
+        showError('Network error. Please try again.');
+      } finally {
+        showLoading(false);
+        document.getElementById('analyze-btn').disabled = false;
+      }
+    });
+
+    function renderAnalysis(data) {
+      document.getElementById('results-placeholder').style.display = 'none';
+      document.getElementById('analysis-output').style.display = 'block';
+
+      // Convert markdown-style formatting to HTML
+      const html = markdownToHtml(data.analysis);
+      document.getElementById('analysis-text').innerHTML = html;
+
+      // Render precedents
+      if (data.precedents && data.precedents.length > 0) {
+        const precSection = document.getElementById('precedents-section');
+        precSection.style.display = 'block';
+        document.getElementById('precedents-list').innerHTML = data.precedents.map(p => `
+          <div class="precedent-card" onclick="window.location='/decisions?q=${encodeURIComponent(p.spr_number)}'">
+            <span class="spr-badge">${escHtml(p.spr_number || 'N/A')}</span>
+            <span class="result-date">${p.date || 'Undated'}</span>
+            <span class="outcome-badge outcome-${p.outcome}">${formatOutcome(p.outcome)}</span>
+            <div class="result-agency">${escHtml(p.agency || '')}</div>
+            <div class="prec-summary">${escHtml(p.request_summary || '')}</div>
+          </div>
+        `).join('');
+      }
+    }
+
+    function markdownToHtml(text) {
+      // Convert numbered headers like "1. **Title**" and "**Title**"
+      return text
+        .replace(/^#{1,3}\s+(.+)$/gm, '<h3>$1</h3>')
+        .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+        .replace(/\*(.+?)\*/g, '<em>$1</em>')
+        .replace(/^(\d+)\.\s+\*\*(.+?)\*\*/gm, '<h4>$1. $2</h4>')
+        .replace(/^[-•]\s+(.+)$/gm, '<li>$1</li>')
+        .replace(/(<li>.*<\/li>\n?)+/gs, m => '<ul>' + m + '</ul>')
+        .replace(/\n{2,}/g, '</p><p>')
+        .replace(/^(?!<[hul])(.+)$/gm, '$1')
+        .replace(/^<\/p><p>$/, '')
+        .replace(/(<h[34]>)/g, '</p>$1<p>')
+        .replace(/<p>\s*<\/p>/g, '');
+    }
+
+    function copyAnalysis() {
+      const text = document.getElementById('analysis-text').innerText;
+      navigator.clipboard.writeText(text).then(() => {
+        const btn = event.target;
+        btn.textContent = 'Copied!';
+        setTimeout(() => btn.textContent = 'Copy Analysis', 2000);
+      });
+    }
+
+    function clearForm() {
+      document.getElementById('request_text').value = '';
+      document.getElementById('agency_response').value = '';
+      document.getElementById('agency_name').value = '';
+      document.getElementById('results-placeholder').style.display = 'flex';
+      document.getElementById('analysis-output').style.display = 'none';
+      document.getElementById('analysis-error').style.display = 'none';
+    }
+
+    function showLoading(on) {
+      document.getElementById('analysis-loading').style.display = on ? 'flex' : 'none';
+      document.getElementById('results-placeholder').style.display = on ? 'none' : document.getElementById('results-placeholder').style.display;
+      document.getElementById('analysis-output').style.display = on ? 'none' : document.getElementById('analysis-output').style.display;
+      document.getElementById('analysis-error').style.display = 'none';
+    }
+
+    function showError(msg) {
+      const el = document.getElementById('analysis-error');
+      el.textContent = msg;
+      el.style.display = 'block';
+    }
+
+    function formatOutcome(outcome) {
+      const map = {
+        ordered_to_provide: 'Ordered to Provide',
+        closed: 'Closed',
+        fee_dispute: 'Fee Dispute',
+        records_withheld: 'Records Withheld',
+        exemption_claimed: 'Exemption',
+        other: 'Other',
+      };
+      return map[outcome] || outcome || 'Unknown';
+    }
+
+    function escHtml(str) {
+      return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+    }
+  </script>
+
+</body>
+</html>

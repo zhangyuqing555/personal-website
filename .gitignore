@@ -1,3 +1,9 @@
 node_modules/
 .env
 .DS_Store
+
+# Large binary files — not suitable for git
+database/*.db
+database/pdfs/
+Public Records Appeals/
+Cowork/
